@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+
+  api:
+    build:
+      context: .
+      dockerfile: api.Dockerfile
+      args:
+      - CMD_BUILD_DIR=access-control-api-rest
+
+    ports:
+      - 8001:8001
+
+    environment:
+
+      # Keys and Passwords are only examples that you can use to test. CHANGE THEM.
+
+      # service
+      # jwt secret keys must be 256 bits
+      # SET NEW SECRET KEYS
+      AUTH_JWT_SIGNING_SECRET_KEY: "J@NcRfUjWnZr4u7x!A%D*G-KaPdSgVkY"
+      AUTH_JWT_ENCRYPTION_SECRET_KEY: "%C*F-JaNdRgUkXp2s5v8x/A?D(G+KbPe"
+      AUTH_JWT_EXPIRATION_TIME_DURATION: "30m"
+
+      # httpserver
+      HTTPSERVER_HOSTNAME: "0.0.0.0"
+      HTTPSERVER_HOST_PORT: 8001
+      HTTPSERVER_READ_HEADER_TIMEOUT_DURATION: "5s"
+      HTTPSERVER_WRITE_TIMEOUT_DURATION: "5s"
+
+      # database
+      DB_HOSTNAME: "<COMPLETE_HOST>"
+      DB_PORT: 1433
+      DB_INSTANCE: "<COMPLETE_INSTANCE>"
+      DB_NAME: "access_control"
+      DB_USER: "<COMPLETE_USER>"
+      DB_PASSWORD: "<COMPLETE_PW>"
+
+      # Duration Strings (see timeouts).
+      # A duration string is a possibly signed sequence of decimal numbers,
+      # each with optional fraction and a unit suffix, such as "300ms", "-1.5h" or "2h45m".
+      # Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".

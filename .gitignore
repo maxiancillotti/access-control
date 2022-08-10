@@ -1,0 +1,8 @@
+/.vscode
+/config
+/docs
+/scripts
+
+*_bak*
+
+docker-compose_DB_ONLY.yaml

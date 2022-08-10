@@ -1,0 +1,96 @@
+version: '3.8'
+
+services:
+
+  api:
+    build:
+      context: .
+      dockerfile: api.Dockerfile
+      args:
+      - CMD_BUILD_DIR=access-control-api-rest
+      
+    ports:
+      - 8001:8001
+    networks:
+      - authbackend
+
+    environment:
+
+      # Keys and Passwords are only examples that you can use to test. CHANGE THEM.
+
+      # service
+      # jwt secret keys must be 256 bits
+      # SET NEW SECRET KEYS
+      AUTH_JWT_SIGNING_SECRET_KEY: "J@NcRfUjWnZr4u7x!A%D*G-KaPdSgVkY"
+      AUTH_JWT_ENCRYPTION_SECRET_KEY: "%C*F-JaNdRgUkXp2s5v8x/A?D(G+KbPe"
+      AUTH_JWT_EXPIRATION_TIME_DURATION: "30m"
+
+      # httpserver
+      HTTPSERVER_HOSTNAME: "0.0.0.0"
+      HTTPSERVER_HOST_PORT: 8001
+      HTTPSERVER_READ_HEADER_TIMEOUT_DURATION: "5s"
+      HTTPSERVER_WRITE_TIMEOUT_DURATION: "5s"
+
+      # database
+      # SET A NEW PASSWORD
+      DB_HOSTNAME: "db"
+      DB_PORT: 1433
+      #DB_INSTANCE: ""
+      DB_NAME: "access_control"
+      DB_USER: "sa"
+      DB_PASSWORD: "JnL=DpQ++HD6iOteJbGXXdv8;;S7|K&<'E&K&&vFV'xT=I6G%f?,-@1sWAMm}W<H"
+
+      # Duration Strings (see timeouts).
+      # A duration string is a possibly signed sequence of decimal numbers,
+      # each with optional fraction and a unit suffix, such as "300ms", "-1.5h" or "2h45m".
+      # Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+    
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    build:
+      context: .
+      dockerfile: sqlserver.Dockerfile
+      args:
+        # SQL SERVER ENVIRONMENT VARIABLES.
+        
+        - ACCEPT_EULA=Y
+        
+        # SET A NEW PASSWORD
+        - MSSQL_SA_PASSWORD=JnL=DpQ++HD6iOteJbGXXdv8;;S7|K&<'E&K&&vFV'xT=I6G%f?,-@1sWAMm}W<H
+        
+        # Change the Edition if needed.
+        #- MSSQL_PID=<your_product_id | edition_name> (default: Developer)
+        - MSSQL_PID=Developer
+        
+        # The SQL Server needs to be prepared before any connection attemp or it will fail.
+        # The database will be created at build time.
+        # Set a time that you consider enough in your environment to wait for the server to
+        # be initialized before attempting to create the database.
+        - SECS_AWAIT_SVR_BOOTUP=100
+
+    ports:
+      - 14330:1433
+    expose:
+      - "1433"
+    networks:
+      - authbackend
+
+    healthcheck:
+      # SET A NEW PASSWORD AFTER -P
+      test: /opt/mssql-tools/bin/sqlcmd -S 127.0.0.1 -U SA -P "JnL=DpQ++HD6iOteJbGXXdv8;;S7|K&<'E&K&&vFV'xT=I6G%f?,-@1sWAMm}W<H" -Q 'select 1'
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      #start_period: 10s
+
+    #volumes:
+      #- ./db/sqlserver/db_backup_vol:/var/opt/mssql/backup
+      #- ./db/sqlserver/db_data_vol:/var/opt/mssql/data
+      #- ./db/sqlserver/db_logs_vol:/var/opt/mssql/log
+
+networks:
+  authbackend:
+    driver: bridge

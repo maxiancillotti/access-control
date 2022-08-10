@@ -1,0 +1,141 @@
+package responseutil
+
+import (
+	"context"
+	"net/http"
+	"strings"
+
+	"github.com/maxiancillotti/access-control/internal/controllers/presenter"
+	"github.com/maxiancillotti/access-control/internal/controllers/requestutil"
+	"github.com/maxiancillotti/logger"
+)
+
+type WriterLogger interface {
+	WriteErrorRespAndLog(ctx context.Context, rw http.ResponseWriter, status int, respErr error, logErr error)
+	WritePresentationHeaderErrorRespAndLog(ctx context.Context, rw http.ResponseWriter, err error, headerKey string, headerValue string)
+	WriteUnauthorizedErrorRespAndLog(ctx context.Context, rw http.ResponseWriter, errLog error, authHeader string)
+	WriteInternalErrorRespAndLogPanic(ctx context.Context, rw http.ResponseWriter, errLog error)
+}
+
+type writerLogger struct {
+	presenter presenter.Presenter
+	logger    logger.Logger
+}
+
+func NewWriterLogger(presenter presenter.Presenter, logger logger.Logger) WriterLogger {
+	return &writerLogger{
+		presenter: presenter,
+		logger:    logger,
+	}
+}
+
+// GENERALS
+
+func (wl *writerLogger) WriteErrorRespAndLog(ctx context.Context, rw http.ResponseWriter, status int, respErr error, logErr error) {
+	wl.presenter.ErrorResp(ctx, rw, status, respErr)
+	// wl.logError(ctx, logErr, status)
+
+	wl.logErrorFINAL(ctx, logErr, status, "", "")
+}
+
+// func (wl *writerLogger) logError(ctx context.Context, err error, status int) {
+// 	if status > 499 {
+// 		wl.logger.Error("internal_error_response", requestutil.GetRequestIDFromCtx(ctx), err, status)
+// 		return
+// 	}
+// 	wl.logger.Warn("client_error_response", requestutil.GetRequestIDFromCtx(ctx), err, status)
+// 	wl.logger.Flush()
+// }
+
+// SPECIALS
+
+func (wl *writerLogger) WritePresentationHeaderErrorRespAndLog(ctx context.Context, rw http.ResponseWriter, err error, headerKey string, headerValue string) {
+
+	status := http.StatusNotAcceptable
+	rw.Header().Add("WWW-Authenticate", "Basic")
+	wl.presenter.ErrorResp(ctx, rw, status, err)
+
+	// var failingHeader = make(http.Header)
+	// failingHeader.Set(headerKey, headerValue)
+
+	// wl.logger.Warn("client_error_response",
+	// 	requestutil.GetRequestIDFromCtx(ctx),
+	// 	err,
+	// 	status,
+	// 	//c.logger.StringField(fmt.Sprint("request_header_", headerKey), headerValue),
+	// 	/*
+	// 		c.logger.Field("request_headers",
+	// 			fmt.Sprintf(`{"%s":"%s"}`, headerKey, headerValue),
+	// 		),
+	// 	*/
+	// 	wl.logger.Field("request_headers", failingHeader),
+	// )
+	// wl.logger.Flush()
+
+	wl.logErrorFINAL(ctx, err, status, headerKey, headerValue)
+}
+
+func (wl *writerLogger) WriteUnauthorizedErrorRespAndLog(ctx context.Context, rw http.ResponseWriter, errLog error, authHeaderVal string) {
+
+	status := http.StatusUnauthorized
+	rw.Header().Add("WWW-Authenticate", "Basic")
+	wl.presenter.ErrorResp(ctx, rw, status, ErrRespAuthBasic)
+
+	// var failingHeader = make(http.Header)
+	// failingHeader.Set("Authorization", authHeader)
+
+	// wl.logger.Warn("client_error_response",
+	// 	requestutil.GetRequestIDFromCtx(ctx),
+	// 	errLog,
+	// 	status,
+	// 	//wl.logger.StringField("request_header_authorization", authHeader),
+	// 	wl.logger.Field("request_headers", failingHeader),
+	// )
+	// wl.logger.Flush()
+
+	wl.logErrorFINAL(ctx, errLog, status, "Authorization", authHeaderVal)
+}
+
+func (wl *writerLogger) WriteInternalErrorRespAndLogPanic(ctx context.Context, rw http.ResponseWriter, errLog error) {
+
+	status := http.StatusInternalServerError
+	wl.presenter.ErrorResp(ctx, rw, status, ErrRespInternalUnexpected)
+
+	// wl.logger.Error("PANIC",
+	// 	requestutil.GetRequestIDFromCtx(ctx),
+	// 	errLog,
+	// 	status,
+	// )
+	// wl.logger.Flush()
+
+	wl.logErrorFINAL(ctx, errLog, status, "", "")
+}
+
+func (wl *writerLogger) logErrorFINAL(ctx context.Context, err error, status int, failingHeaderKey string, failingHeaderValue string) {
+
+	var logMsgKey string
+	reqID := requestutil.GetRequestIDFromCtx(ctx)
+
+	// INTERNAL SERVER ERROR
+	if status > 499 {
+		if strings.Contains(err.Error(), logMsgKeyPANIC) {
+			logMsgKey = logMsgKeyPANIC
+		} else {
+			logMsgKey = logMsgKeyInternalErr
+		}
+		wl.logger.Error(logMsgKey, reqID, err, status)
+
+	} else { // CLIENT ERROR
+		logMsgKey = logMsgKeyClientErr
+
+		if failingHeaderKey == "" {
+			wl.logger.Warn(logMsgKey, reqID, err, status)
+		} else {
+			var failingHeader = make(http.Header)
+			failingHeader.Set(failingHeaderKey, failingHeaderValue)
+
+			wl.logger.Warn(logMsgKey, reqID, err, status, wl.logger.Field("request_headers", failingHeader))
+		}
+	}
+	wl.logger.Flush()
+}
